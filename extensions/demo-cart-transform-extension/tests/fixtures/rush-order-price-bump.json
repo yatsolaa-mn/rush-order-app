@@ -1,0 +1,47 @@
+{
+  "payload": {
+    "export": "cart_transform_run",
+    "target": "cart.transform.run",
+    "input": {
+      "cart": {
+        "lines": [
+          {
+            "id": "gid://shopify/CartLine/99",
+            "quantity": 1,
+            "rush_order": { "value": "true" },
+            "cost": {
+              "amountPerQuantity": {
+                "amount": "10.00"
+              }
+            },
+            "merchandise": {
+              "__typename": "ProductVariant",
+              "id": "gid://shopify/ProductVariant/2",
+              "product": {
+                "rush_order_cost": { "value": "20" }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "output": {
+      "operations": [
+        {
+          "lineUpdate": {
+            "cartLineId": "gid://shopify/CartLine/99",
+            "image": null,
+            "price": {
+              "adjustment": {
+                "fixedPricePerUnit": {
+                  "amount": "12.0"
+                }
+              }
+            },
+            "title": null
+          }
+        }
+      ]
+    }
+  }
+}
