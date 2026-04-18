@@ -1,74 +1,59 @@
-# Shopify App Template - Extension only
+# Rush Order App (extension-only)
 
-This is a template for building an [extension-only Shopify app](https://shopify.dev/docs/apps/build/app-extensions/build-extension-only-app). It contains the basics for building a Shopify app that uses only app extensions.
+This is an [extension-only Shopify app](https://shopify.dev/docs/apps/build/app-extensions/build-extension-only-app): it ships **app extensions** (here, a **Cart Transform** Shopify Function) and does **not** include a custom app server or an embedded Admin UI by default. For a full hosted app with OAuth routes and Admin embedding, use a template such as the [Remix app template](https://github.com/Shopify/shopify-app-template-remix).
 
-This template doesn't include a server or the ability to embed a page in the Shopify Admin. If you want either of these capabilities, choose the [Remix app template](https://github.com/Shopify/shopify-app-template-remix) instead.
+## How it works
 
-Whether you choose to use this template or another one, you can use your preferred package manager and the Shopify CLI with [these steps](#installing-the-template).
+1. **Cart Transform function** (`extensions/demo-cart-transform-extension`) is a **Rust** function compiled to **WebAssembly**. It runs on Shopify’s infrastructure when the cart is evaluated (target `cart.transform.run`).
+2. **Input** is defined in `extensions/demo-cart-transform-extension/src/run.graphql`: cart lines, the line property `_rush_order`, per-line cost, and the product metafield `custom.rush_order_cost`.
+3. **Logic** (in `src/run.rs`): if a line has `_rush_order` set to `"true"` (case-insensitive) and the product has a valid positive percentage in `rush_order_cost`, the function emits a **`lineUpdate`** operation with **`fixedPricePerUnit`** so the unit price becomes  
+   `currentUnitPrice × (1 + percentage / 100)`.
+4. Lines without rush selection, non-variant merchandise, or missing/invalid metafields are left unchanged.
 
-## Benefits
+**Store setup (outside this repo):** merchants must define the product metafield **`custom.rush_order_cost`** (decimal, e.g. `20` for 20%), and the storefront or cart integration must set the **line item property** **`_rush_order`** to `"true"` when the buyer chooses a rush order.
 
-Shopify apps are built on a variety of Shopify tools to create a great merchant experience. The [create an app](https://shopify.dev/docs/apps/getting-started/create) tutorial in our developer documentation will guide you through creating a Shopify app.
+**Plan / API note:** price override via `lineUpdate` is subject to Shopify’s rules for your store plan and environment (see [Cart Transform](https://shopify.dev/docs/api/functions/reference/cart-transform) documentation).
 
-This app template does little more than install the CLI and scaffold a repository.
+## Activating the function on a shop (Admin GraphQL)
 
-## Getting started
+Deploying the extension or running `shopify app dev` **does not** permanently attach the function to a store as the active cart transform. You must **register** it with the **Shopify Admin GraphQL API** using an access token from your app (OAuth install) that includes the **`write_cart_transforms`** scope (see `shopify.app.toml`).
 
-### Requirements
+Use the **`cartTransformCreate`** mutation (and related queries/mutations if you need to update or remove it). Example shape:
 
-1. You must [download and install Node.js](https://nodejs.org/en/download/) if you don't already have it.
-1. You must [create a Shopify partner account](https://partners.shopify.com/signup) if you don’t have one.
-1. You must create a store for testing if you don't have one, either a [development store](https://help.shopify.com/en/partners/dashboard/development-stores#create-a-development-store) or a [Shopify Plus sandbox store](https://help.shopify.com/en/partners/dashboard/managing-stores/plus-sandbox-store).
-
-### Installing the template
-
-This template can be installed using your preferred package manager:
-
-Using yarn:
-
-```shell
-yarn create @shopify/app
+```graphql
+mutation CartTransformRegister($cartTransform: CartTransformInput!) {
+  cartTransformCreate(cartTransform: $cartTransform) {
+    cartTransform {
+      id
+      functionId
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
 ```
 
-Using npm:
+Variables typically include either **`functionId`** (Function GID) or **`functionHandle`** (your extension handle, e.g. `demo-cart-transform-extension`), depending on API version—see current [Admin API mutation docs](https://shopify.dev/docs/api/admin-graphql/latest/mutations/cartTransformCreate).
+
+## Local development
+
+- **Requirements:** [Node.js](https://nodejs.org/), [Shopify Partner account](https://partners.shopify.com/signup), a [development store](https://help.shopify.com/en/partners/dashboard/development-stores#create-a-development-store) (or appropriate test store). For this extension, you also need **Rust** and the **`wasm32-unknown-unknown`** target so `cargo build` succeeds when the CLI builds the function.
+- Install dependencies: `npm install`
+- Run the app in dev mode: `npm run dev` (runs `shopify app dev`).
+
+The [Shopify CLI](https://shopify.dev/docs/apps/tools/cli) links the project to your Partner app and can update preview URLs on the dev store.
+
+## Original template install (reference)
+
+If you are creating a **new** app from the official template instead of cloning this repo:
 
 ```shell
 npm init @shopify/app@latest
 ```
 
-Using pnpm:
-
-```shell
-pnpm create @shopify/app@latest
-```
-
-This will clone the template and install the required dependencies.
-
-#### Local Development
-
-[The Shopify CLI](https://shopify.dev/docs/apps/tools/cli) connects to an app in your Partners dashboard. It provides environment variables and runs commands in parallel.
-
-You can develop locally using your preferred package manager. Run one of the following commands from the root of your app.
-
-Using yarn:
-
-```shell
-yarn dev
-```
-
-Using npm:
-
-```shell
-npm run dev
-```
-
-Using pnpm:
-
-```shell
-pnpm run dev
-```
-
-Open the URL generated in your console. Once you grant permission to the app, you can start development (such as generating extensions).
+Then follow Shopify’s [create an app](https://shopify.dev/docs/apps/getting-started/create) guide.
 
 ## Developer resources
 
@@ -76,3 +61,4 @@ Open the URL generated in your console. Once you grant permission to the app, yo
 - [App extensions](https://shopify.dev/docs/apps/build/app-extensions)
 - [Extension only apps](https://shopify.dev/docs/apps/build/app-extensions/build-extension-only-app)
 - [Shopify CLI](https://shopify.dev/docs/apps/tools/cli)
+- [Cart Transform Function API](https://shopify.dev/docs/api/functions/reference/cart-transform)
