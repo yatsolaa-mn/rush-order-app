@@ -1,0 +1,27 @@
+query RushOrderCartTransformInput {
+  cart {
+    lines {
+      id
+      quantity
+      rush_order: attribute(key: "_rush_order") {
+        value
+      }
+      cost {
+        amountPerQuantity {
+          amount
+        }
+      }
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          id
+          product {
+            rush_order_cost: metafield(namespace: "custom", key: "rush_order_cost") {
+              value
+            }
+          }
+        }
+      }
+    }
+  }
+}
